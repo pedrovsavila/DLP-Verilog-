@@ -1,34 +1,65 @@
-module acess_ctrl (	input clk, fechou,
+module acess_ctrl (	input clk0, rst,enter,
 							input [7:0] senha_digitada, 
 							output resultado);
 
+	//rst : SW[17]						// inverter reset caso seja bt e nao sw
+	//enter : KEY[3]				
+	//senha_digitada: SW[7]:SW[0]
+	// resultado : LEDG[0]
 	
-	reg [2:0] cnt = 1'b0;
-	wire [7:0] senha_mem;
-		
-	always @ (posedge clk) begin
+wire [4:0] mem_addr;
+wire [7:0] out_mem;
+wire ena_cnt, rst_cnt;
+//wire FC_cnt;
+wire FC;
+wire enter_sync;
+wire clk;
+
+//assign FC_cnt = (out_mem == senha_digitada) | FC;
+
+mycontrol mycontrol(
+                    .clk(clk),
+						  .reset(rst),
+						  .enter(enter_sync),
+						  .senha(senha_digitada),
+						  .out_mem(out_mem),
+						  .ena_cnt(ena_cnt),
+						  .status(resultado),
+						  .reset_cnt(rst_cnt),
+						  .FC(FC)
+						  );
 	
-			if (resultado == 1'b0 )begin
-				if (cnt < 3'd7) 
-					cnt <= cnt + 3'b1;
-				if (cnt > 3'd7 & fechou ==1) 
-					cnt <= 0;	
-			end
-			
-			if (resultado == 1'b1 )begin
-				if (fechou == 1) 
-					cnt <= 3'b0	;
-			end
-		end
+binary_counter #(
+                 .WIDTH(5)
+					 )
+                myCNT
+                (
+                .clk(clk), 
+                .enable(ena_cnt), 
+                .reset(rst_cnt),
+                .count(mem_addr),
+					 .FC(FC)
+                );						
 	
-						
-	comparador comp ( .a(senha_mem),
-							.b(senha_digitada),
-							.y(resultado));							
-	
-	single_port_ROM ROM (	.clk(clk),
-								   .addr(cnt),
-								   .data_out(senha_mem)
+myROM	myROM_inst (
+	               .address (mem_addr),
+	               .clock (clk),
+	               .q (out_mem)
+	               );
+				
+
+
+sincronizador one_shot( .clr_n(~rst), 
+								.clk(clk),
+								.in(~enter),
+								.out(enter_sync)
 							  );
+							  
+PLL	PLL_inst(								// comentar PLL para simular 
+					 .areset ( rst ),
+					 .inclk0 ( clk0 ),
+					 .c0 ( clk )
+					);
+
 							
 endmodule
